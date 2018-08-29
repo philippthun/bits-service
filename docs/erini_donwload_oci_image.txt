@@ -1,0 +1,18 @@
+title Bits-Service Registry Download
+
+OPI-Client -> Bits-Service-Registry: Get OCI representation <app_guid>
+Bits-Service-Registry -> CloudController: /v3/apps/<app-guid>/droplets/current
+CloudController -> Bits-Service-Registry:current droplet-guid
+Bits-Service-Registry -> Blob-Store: Load Droplet 
+Bits-Service-Registry -> Bits-Service-Registry: Convert droplet
+Bits-Service-Registry -> Bits-Service-Registry: generate OCI conform sha
+Bits-Service-Registry -> Bits-Service-Registry: Generate Manifest dynamically 
+Bits-Service-Registry -> OPI-Client: Serve OCI Manifest
+
+# download layer (2 calls or 1 call?)
+OPI-Client -> Bits-Service-Registry: Request RootFs blob
+Bits-Service-Registry -> Blob-Store: Load RootFs blob
+Bits-Service-Registry -> OPI-Client: Serve RootFs layers blob
+
+OPI-Client -> Bits-Service-Registry: Request Droplet Layer blob
+Bits-Service-Registry -> OPI-Client: Serve Droplet Layer blob
