@@ -2,6 +2,7 @@ package bitsgo_test
 
 import (
 	"archive/zip"
+	"fmt"
 	"io/ioutil"
 	"math"
 	"os"
@@ -9,13 +10,12 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/pkg/errors"
-
-	"github.com/cloudfoundry-incubator/bits-service"
+	bitsgo "github.com/cloudfoundry-incubator/bits-service"
 	inmemory "github.com/cloudfoundry-incubator/bits-service/blobstores/inmemory"
 	. "github.com/cloudfoundry-incubator/bits-service/matchers"
 	. "github.com/cloudfoundry-incubator/bits-service/testutil"
 	. "github.com/petergtz/pegomock"
+	"github.com/pkg/errors"
 )
 
 var _ = Describe("CreateTempZipFileFrom", func() {
@@ -39,6 +39,27 @@ var _ = Describe("CreateTempZipFileFrom", func() {
 		Expect(e).NotTo(HaveOccurred())
 		Expect(reader.File).To(HaveLen(1))
 		VerifyZipFileEntry(&reader.Reader, "filename1", "filename1 content")
+	})
+
+	It("Expects a zip with unchanged 'Modified time' property", func() {
+		Expect(blobstore.Put("abc", strings.NewReader("filename1 content"))).To(Succeed())
+
+		tempFileName, e := bitsgo.CreateTempZipFileFrom([]bitsgo.Fingerprint{
+			bitsgo.Fingerprint{
+				Sha1: "abc",
+				Fn:   "filename1",
+				Mode: "644",
+			},
+		}, nil, 0, math.MaxUint64, blobstore, NewMockMetricsService())
+		Expect(e).NotTo(HaveOccurred())
+
+		reader, e := zip.OpenReader(tempFileName)
+		Expect(e).NotTo(HaveOccurred())
+		Expect(reader.File).To(HaveLen(1))
+		lm := reader.File[0].FileHeader.Modified
+		lastmodified := fmt.Sprintf("%d-%02d-%02dT%02d:%02d:%02d-00:00\n", lm.Year(), lm.Month(), lm.Day(),
+			lm.Hour(), lm.Minute(), lm.Second())
+		Expect(string(lastmodified)).NotTo(ContainSubstring("1979-11-30"))
 	})
 
 	Context("One error from blobstore", func() {
