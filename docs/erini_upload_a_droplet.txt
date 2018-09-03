@@ -1,0 +1,12 @@
+title Bits-Service Registry Upload Sequence
+
+Client -> CloudController: cf-push
+CloudController -> Backend(Container Ocestrator): init staging
+Backend(Container Ocestrator) -> Backend(Container Ocestrator): staging
+Backend(Container Ocestrator) -> CloudController: Upload droplet
+CloudController -> Bits-Service: Upload droplet
+Bits-Service -> Blob-Store: Save droplet
+Bits-Service -> CloudController: Acknowledge (OK/Error)
+CloudController -> Backend(Container Ocestrator): Acknowledge (OK/Error)
+Backend(Container Ocestrator) -> CloudController: staging done
+
