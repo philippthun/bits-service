@@ -4,7 +4,6 @@ import (
 	"archive/zip"
 	"crypto/sha1"
 	"encoding/hex"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -97,33 +96,13 @@ func CreateTempZipFileFrom(bundlesPayload []Fingerprint,
 	}
 
 	for _, entry := range bundlesPayload {
-		// zipEntry, e := zipWriter.CreateHeader(zipEntryHeader(entry.Fn, fileModeFrom(entry.Mode)))
-		// if e != nil {
-		// 	return "", errors.Wrap(e, "Could create header in zip file")
-		// }
+		zipEntry, e := zipWriter.CreateHeader(zipEntryHeaderWithModifiedTime(entry.Fn, fileModeFrom(entry.Mode), time.Now()))
+		if e != nil {
+			return "", errors.Wrap(e, "Could create header in zip file")
+		}
 
 		e = backoff.RetryNotify(func() error {
 			b, e := blobstore.Get(entry.Sha1)
-			// switch to os.tempfolder
-			tempFilePath := "/tmp/" + entry.Sha1
-			fd, err := os.OpenFile(tempFilePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(fileModeFrom(entry.Mode)))
-			if err != nil {
-				return err
-			}
-			_, err = io.Copy(fd, b)
-
-			defer fd.Close()
-			if err != nil {
-				return err
-			}
-			fmt.Printf("fd: %v type: %T", fd, fd)
-			stat, _ := fd.Stat()
-			fmt.Printf("fd: %v type: %T", stat.ModTime(), fd)
-
-			zipEntry, e := zipWriter.CreateHeader(zipEntryHeader(entry.Fn, fileModeFrom(entry.Mode)))
-			if e != nil {
-				return errors.Wrap(e, "Could create header in zip file")
-			}
 
 			if e != nil {
 				if _, ok := e.(*NotFoundError); ok {
@@ -158,15 +137,6 @@ func fileModeFrom(s string) os.FileMode {
 		return 0744
 	}
 	return os.FileMode(mode)
-}
-
-func zipEntryHeader(name string, mode os.FileMode) *zip.FileHeader {
-	header := &zip.FileHeader{
-		Name:   name,
-		Method: zip.Deflate,
-	}
-	header.SetMode(mode)
-	return header
 }
 
 func zipEntryHeaderWithModifiedTime(name string, mode os.FileMode, modified time.Time) *zip.FileHeader {
