@@ -2,7 +2,6 @@ package bitsgo_test
 
 import (
 	"archive/zip"
-	"fmt"
 	"io/ioutil"
 	"math"
 	"os"
@@ -59,9 +58,7 @@ var _ = Describe("CreateTempZipFileFrom", func() {
 			Expect(e).NotTo(HaveOccurred())
 			Expect(reader.File).To(HaveLen(1))
 			lm := reader.File[0].FileHeader.Modified
-			lastmodified := fmt.Sprintf("%d-%02d-%02dT%02d:%02d:%02d-00:00\n", lm.Year(), lm.Month(), lm.Day(),
-				lm.Hour(), lm.Minute(), lm.Second())
-			Expect(string(lastmodified)).NotTo(ContainSubstring("1979-11-30"))
+			Expect(dateFormatter(lm)).NotTo(ContainSubstring("1979-11-30"))
 		})
 
 		It("should not be manipulated for uploaded files", func() {
@@ -89,8 +86,7 @@ var _ = Describe("CreateTempZipFileFrom", func() {
 
 		It("should provide the current datetime for files retrieved from the bundles_cache", func() {
 			Expect(blobstore.Put("abc", strings.NewReader("filename1 content"))).To(Succeed())
-
-			_, e := bitsgo.CreateTempZipFileFrom([]bitsgo.Fingerprint{
+			tempFileName, e := bitsgo.CreateTempZipFileFrom([]bitsgo.Fingerprint{
 				bitsgo.Fingerprint{
 					Sha1: "abc",
 					Fn:   "filename1",
@@ -98,6 +94,13 @@ var _ = Describe("CreateTempZipFileFrom", func() {
 				},
 			}, nil, 0, math.MaxUint64, blobstore, NewMockMetricsService())
 			Expect(e).NotTo(HaveOccurred())
+
+			reader, e := zip.OpenReader(tempFileName)
+			Expect(e).NotTo(HaveOccurred())
+			lm := reader.File[0].FileHeader.Modified
+
+			d := time.Since(lm)
+			Expect(d.Seconds()).Should(BeNumerically("<", 2), "We accept difference from 2s for cached files.")
 		})
 	})
 
