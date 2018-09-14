@@ -42,6 +42,7 @@ var _ = Describe("CreateTempZipFileFrom", func() {
 		VerifyZipFileEntry(&reader.Reader, "filename1", "filename1 content")
 	})
 	Context("Handles the 'Modified time' property", func() {
+
 		It("should not contain '1979-11-30'", func() {
 			Expect(blobstore.Put("abc", strings.NewReader("filename1 content"))).To(Succeed())
 
@@ -62,13 +63,13 @@ var _ = Describe("CreateTempZipFileFrom", func() {
 				lm.Hour(), lm.Minute(), lm.Second())
 			Expect(string(lastmodified)).NotTo(ContainSubstring("1979-11-30"))
 		})
+
 		It("should not be manipulated for uploaded files", func() {
 			tmpfile, modTime := createTmpFile()
 			tmpfilereader, e := os.Open(tmpfile)
 			defer os.Remove(tmpfile)
 			Expect(e).NotTo(HaveOccurred())
 			response := blobstore.Put("abc", tmpfilereader)
-			fmt.Printf("%v", response)
 			Expect(response).To(Succeed())
 
 			tempFileName, e := bitsgo.CreateTempZipFileFrom([]bitsgo.Fingerprint{
@@ -82,8 +83,10 @@ var _ = Describe("CreateTempZipFileFrom", func() {
 			reader, e := zip.OpenReader(tempFileName)
 			Expect(e).NotTo(HaveOccurred())
 			lm := reader.File[0].FileHeader.Modified
-			Expect(lm).To(Equal(modTime))
+
+			Expect(dateFormatter(lm)).To(Equal(dateFormatter(modTime)))
 		})
+
 		It("should provide the current datetime for files retrieved from the bundles_cache", func() {
 			Expect(blobstore.Put("abc", strings.NewReader("filename1 content"))).To(Succeed())
 
@@ -96,7 +99,6 @@ var _ = Describe("CreateTempZipFileFrom", func() {
 			}, nil, 0, math.MaxUint64, blobstore, NewMockMetricsService())
 			Expect(e).NotTo(HaveOccurred())
 		})
-
 	})
 
 	Context("One error from blobstore", func() {
@@ -202,7 +204,7 @@ var _ = Describe("CreateTempZipFileFrom", func() {
 
 func createTmpFile() (string, time.Time) {
 	content := []byte("filename1 content")
-	tmpfile, e := ioutil.TempFile("/tmp/unit-test", "example")
+	tmpfile, e := ioutil.TempFile("", "example")
 	Expect(e).NotTo(HaveOccurred())
 
 	_, e = tmpfile.Write(content)
@@ -213,4 +215,8 @@ func createTmpFile() (string, time.Time) {
 	Expect(e).NotTo(HaveOccurred())
 	modTime := fileInfo.ModTime()
 	return tmpfile.Name(), modTime
+}
+
+func dateFormatter(anyTimeFormat time.Time) string {
+	return anyTimeFormat.UTC().Format(time.UnixDate)
 }
