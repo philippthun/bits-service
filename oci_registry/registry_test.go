@@ -11,7 +11,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-
 	registry "github.com/cloudfoundry-incubator/bits-service/oci_registry"
 	"github.com/cloudfoundry-incubator/bits-service/oci_registry/oci_registryfakes"
 )
@@ -19,20 +18,35 @@ import (
 var _ = Describe("Registry", func() {
 	var (
 		fakeServer   *httptest.Server
+		imageManager *oci_registryfakes.FakeImageManager
 		handler      http.Handler
 		url          string
-		imageManager *oci_registryfakes.FakeImageManager
 		res          *http.Response
 		err          error
 	)
 
-	BeforeEach(func() {
-		imageManager = new(oci_registryfakes.FakeImageManager)
-		handler = registry.NewHandler(imageManager)
-		fakeServer = httptest.NewServer(handler)
+	Context("is running", func() {
+
+		BeforeEach(func() {
+			apiManager := new(oci_registryfakes.FakeAPIVersionManager)
+			handler = registry.NewAPIVersionHandler(apiManager)
+			fakeServer = httptest.NewServer(handler)
+		})
+		It("Serves the /v2 endpoint so that the client skips authentication", func() {
+			res, err := http.Get(fakeServer.URL + "/v2/")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(res.StatusCode).To(Equal(200))
+		})
 	})
 
 	Context("when requesting a manifest", func() {
+
+		BeforeEach(func() {
+			imageManager = new(oci_registryfakes.FakeImageManager)
+			handler = registry.NewImageHandler(imageManager)
+			fakeServer = httptest.NewServer(handler)
+		})
+
 		Context("for an image name and tag", func() {
 
 			BeforeEach(func() {
