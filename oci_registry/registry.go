@@ -27,16 +27,6 @@ type APIVersionHandler struct {
 	apiVersionManager APIVersionManager
 }
 
-// func NewHandler(imageManager ImageManager, apiVersionManager APIVersionManager) http.Handler {
-// 	mux := mux.NewRouter()
-// 	imageHandler := ImageHandler{imageManager}
-// 	apiVersionHandler := APIVersionHandler{apiVersionManager}
-// 	mux.Path("/v2/").Methods(http.MethodGet).HandlerFunc(apiVersionHandler.APIVersion)
-// 	mux.Path("/v2/{name:[a-z0-9/\\.\\-_]+}/manifest/{tag}").Methods(http.MethodGet).HandlerFunc(imageHandler.ServeManifest)
-// 	mux.Path("/v2/{name:[a-z0-9/\\.\\-_]+}/blobs/{digest}").Methods(http.MethodGet).HandlerFunc(imageHandler.ServeLayer)
-// 	return mux
-// }
-
 func NewImageHandler(imageManager ImageManager) http.Handler {
 	mux := mux.NewRouter()
 	imageHandler := ImageHandler{imageManager}
