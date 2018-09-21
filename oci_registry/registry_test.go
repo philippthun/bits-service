@@ -159,4 +159,28 @@ var _ = Describe("Registry", func() {
 			})
 		})
 	})
+	// Context("manifest integration test", func() {
+
+	// 	BeforeEach(func() {
+	// 		url = "/v2/cloudfoundry/manifest/image-tag"
+	// 		//imageManager = new(registry.BitsImageManager)
+
+	// 		handler = registry.NewImageHandler(realImageManager)
+	// 		fakeServer = httptest.NewServer(handler)
+	// 	})
+	// 	It("should return a valid manifest JSON", func() {
+	// 		res, err = http.Get(url)
+	// 		defer res.Body.Close()
+	// 		Expect(err).NotTo(HaveOccurred())
+	// 		content, _ := ioutil.ReadAll(res.Body)
+	// 		var manifest docker.Manifest
+	// 		err := json.Unmarshal(content, &manifest)
+	// 		fmt.Printf(manifest.SchemaVersion)
+	// 		Expect(err).NotTo(HaveOccurred())
+	// 		Expect(manifest.MediaType).To(Equal("application/vnd.docker.distribution.manifest.v2+json"), "manifest media type")
+	// 		Expect(manifest.SchemaVersion).To(Equal("v2"))
+	// 		Expect(manifest.Config.MediaType).To(Equal("application/vnd.docker.container.image.v1+json"), "config media type")
+	// 		Expect(manifest.Layers[0].MediaType).To(Equal("application/vnd.docker.image.rootfs.diff.tar.gzip"))
+	// 	})
+	// })
 })

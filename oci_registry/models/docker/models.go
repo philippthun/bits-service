@@ -2,7 +2,7 @@ package docker
 
 type Manifest struct {
 	MediaType     string    `json: mediaType`
-	SchemaVersion int       `json: schemaVersion`
+	SchemaVersion string    `json: schemaVersion`
 	Config        Content   `json: config`
 	Layers        []Content `json: layers`
 }
