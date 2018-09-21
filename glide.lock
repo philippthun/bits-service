@@ -110,6 +110,8 @@ imports:
   - util
   - watch
   - winfile
+- name: github.com/inconshreveable/mousetrap
+  version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
 - name: github.com/jmespath/go-jmespath
   version: c2b33e8439af944379acbdd9c3a5fe0bc44bd8a5
 - name: github.com/marstr/guid
@@ -162,6 +164,10 @@ imports:
   version: 059132a15dd08d6704c67711dae0cf35ab991756
 - name: github.com/satori/go.uuid
   version: b2ce2384e17bbe0c6d34077efa39dbab3e09123b
+- name: github.com/spf13/cobra
+  version: 8d114be902bc9f08717804830a55c48378108a28
+- name: github.com/spf13/pflag
+  version: 298182f68c66c05229eb03ac171abe6e309ee79a
 - name: github.com/tecnickcom/statsd
   version: b5fbf096b31b1cb3cc0bcf887fbb0f1a5d3ee7e5
 - name: github.com/urfave/negroni
