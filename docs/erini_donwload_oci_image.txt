@@ -1,12 +1,18 @@
-title Bits-Service Registry Upload Sequence
+title Bits-Service Registry Download
 
-Client -> CloudController: cf-push
-CloudController -> Backend(Container Ocestrator): init staging
-Backend(Container Ocestrator) -> Backend(Container Ocestrator): staging
-Backend(Container Ocestrator) -> CloudController: Upload droplet
-CloudController -> Bits-Service: Upload droplet
-Bits-Service -> Blob-Store: Save droplet
-Bits-Service -> CloudController: Acknowledge (OK/Error)
-CloudController -> Backend(Container Ocestrator): Acknowledge (OK/Error)
-Backend(Container Ocestrator) -> CloudController: staging done
+OPI-Client -> Bits-Service-Registry: Get OCI representation <app_guid>
+Bits-Service-Registry -> CloudController: /v3/apps/<app-guid>/droplets/current
+CloudController -> Bits-Service-Registry:current droplet-guid
+Bits-Service-Registry -> Blob-Store: Load Droplet 
+Bits-Service-Registry -> Bits-Service-Registry: Convert droplet
+Bits-Service-Registry -> Bits-Service-Registry: generate OCI conform sha
+Bits-Service-Registry -> Bits-Service-Registry: Generate Manifest dynamically 
+Bits-Service-Registry -> OPI-Client: Serve OCI Manifest
 
+# download layer (2 calls or 1 call?)
+OPI-Client -> Bits-Service-Registry: Request RootFs blob
+Bits-Service-Registry -> Blob-Store: Load RootFs blob
+Bits-Service-Registry -> OPI-Client: Serve RootFs layers blob
+
+OPI-Client -> Bits-Service-Registry: Request Droplet Layer blob
+Bits-Service-Registry -> OPI-Client: Serve Droplet Layer blob
