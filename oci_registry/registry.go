@@ -2,8 +2,13 @@ package oci_registry
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
+
+	"github.com/cloudfoundry-incubator/bits-service/oci_registry/models/docker"
+	"github.com/cloudfoundry-incubator/bits-service/oci_registry/models/docker/mediatype"
 
 	"github.com/gorilla/mux"
 )
@@ -16,7 +21,7 @@ type ImageManager interface {
 }
 
 type ImageHandler struct {
-	imageManager ImageManager
+	imageManager ImageManager //ggf *ImageManager (need to adjust the functions accordingly)
 }
 
 type APIVersionHandler struct {
@@ -36,6 +41,7 @@ func NewAPIVersionHandler() http.Handler {
 	return mux
 }
 
+//APIVersion returns HTTP 200 purpously
 func APIVersion(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
@@ -77,4 +83,45 @@ func (m ImageHandler) ServeLayer(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("failed to stream layer"))
 	}
+}
+
+type BitsImageManager struct {
+}
+
+func (b BitsImageManager) GetManifest(string, string) ([]byte, error) {
+	layers := []docker.Content{
+		docker.Content{
+			MediaType: mediatype.ImageRootfsTarGzip, //??
+			Digest:    "to be calculated",
+			Size:      42,
+		},
+	}
+
+	config := docker.Content{
+		MediaType: mediatype.ContainerImageJson, //??
+		Digest:    "to be calculated",
+		Size:      1337,
+	}
+
+	manifest := docker.Manifest{
+		MediaType:     mediatype.DistributionManifestJson,
+		SchemaVersion: "v2",
+		Config:        config,
+		Layers:        layers,
+	}
+
+	json, err := json.Marshal(manifest)
+	if err != nil {
+		return nil, err
+	}
+
+	return json, nil
+}
+
+func (b BitsImageManager) GetLayer(string, string) (*bytes.Buffer, error) {
+	return nil, errors.New("unimplemented")
+}
+
+func (b BitsImageManager) Has(digest string) bool {
+	return false
 }
