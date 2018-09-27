@@ -28,8 +28,7 @@ var _ = Describe("Registry", func() {
 	Context("is running", func() {
 
 		BeforeEach(func() {
-			apiManager := new(oci_registryfakes.FakeAPIVersionManager)
-			handler = registry.NewAPIVersionHandler(apiManager)
+			handler = registry.NewAPIVersionHandler()
 			fakeServer = httptest.NewServer(handler)
 		})
 		It("Serves the /v2 endpoint so that the client skips authentication", func() {
@@ -182,5 +181,5 @@ var _ = Describe("Registry", func() {
 	// 		Expect(manifest.Config.MediaType).To(Equal("application/vnd.docker.container.image.v1+json"), "config media type")
 	// 		Expect(manifest.Layers[0].MediaType).To(Equal("application/vnd.docker.image.rootfs.diff.tar.gzip"))
 	// 	})
-	// })
+	//})
 })

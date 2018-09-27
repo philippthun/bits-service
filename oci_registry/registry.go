@@ -19,12 +19,7 @@ type ImageHandler struct {
 	imageManager ImageManager
 }
 
-//go:generate conterfeiter . APIVersionManager
-type APIVersionManager interface {
-	APIVersion(string, string) ([]byte, error)
-}
 type APIVersionHandler struct {
-	apiVersionManager APIVersionManager
 }
 
 func NewImageHandler(imageManager ImageManager) http.Handler {
@@ -35,14 +30,13 @@ func NewImageHandler(imageManager ImageManager) http.Handler {
 	return mux
 }
 
-func NewAPIVersionHandler(apiVersionManager APIVersionManager) http.Handler {
+func NewAPIVersionHandler() http.Handler {
 	mux := mux.NewRouter()
-	apiVersionHandler := APIVersionHandler{apiVersionManager}
-	mux.Path("/v2/").Methods(http.MethodGet).HandlerFunc(apiVersionHandler.APIVersion)
+	mux.Path("/v2/").Methods(http.MethodGet).HandlerFunc(APIVersion)
 	return mux
 }
 
-func (a APIVersionHandler) APIVersion(w http.ResponseWriter, r *http.Request) {
+func APIVersion(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
