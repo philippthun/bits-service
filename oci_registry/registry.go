@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -111,8 +112,7 @@ func (b BitsImageManager) GetManifest(string, string) ([]byte, error) {
 		fmt.Printf("preFixDroplet Error: %v\n", err)
 		return nil, err
 	}
-	dropletSHA := getSHA256(ociDropletName)
-	fmt.Println(dropletSHA)
+	dropletDigest := getSHA256(ociDropletName)
 
 	dropletSize, err := getFileSize(ociDropletName)
 	if err != nil {
@@ -137,6 +137,13 @@ func (b BitsImageManager) GetManifest(string, string) ([]byte, error) {
 		return nil, err
 	}
 
+	// Config
+	configDigest, configSize, err := getConfigMetaData(rootfsDigest, dropletDigest)
+	if err != nil {
+		fmt.Printf("Config Metadata Error: %v\n", err)
+		return nil, err
+	}
+
 	layers := []docker.Content{
 		docker.Content{
 			//Rootfs
@@ -147,15 +154,15 @@ func (b BitsImageManager) GetManifest(string, string) ([]byte, error) {
 		docker.Content{
 			//Droplet
 			MediaType: mediatype.ImageRootfsTar,
-			Digest:    dropletSHA,
+			Digest:    dropletDigest,
 			Size:      dropletSize,
 		},
 	}
 
 	config := docker.Content{
 		MediaType: mediatype.ContainerImageJson,
-		Digest:    "to be calculated",
-		Size:      1337,
+		Digest:    configDigest,
+		Size:      configSize,
 	}
 
 	manifest := docker.Manifest{
@@ -248,4 +255,32 @@ func getFileSize(fileName string) (int64, error) {
 	}
 	fmt.Printf("The file is %d bytes long\n", fileInfo.Size())
 	return fileInfo.Size(), nil
+}
+
+func getConfigMetaData(rootfsDigest string, dropletDigest string) (string, int64, error) {
+	// TODO: ns, tzip why is this necessary?
+	// TDOO: ns, tzip how to handle this?
+	config, err := json.Marshal(map[string]interface{}{
+		"config": map[string]interface{}{
+			"user": "vcap",
+		},
+		"rootfs": map[string]interface{}{
+			"type": "layers",
+			"diff_ids": []string{
+				rootfsDigest,
+				dropletDigest,
+			},
+		},
+	})
+	buf := bytes.NewReader(config)
+	sum := sha256.New()
+	stored := &bytes.Buffer{}
+	var size int64
+	if size, err = io.Copy(io.MultiWriter(sum, stored), buf); err != nil {
+		return "", 0, err
+	}
+
+	digest := "sha256:" + hex.EncodeToString(sum.Sum(nil))
+
+	return digest, size, nil
 }
