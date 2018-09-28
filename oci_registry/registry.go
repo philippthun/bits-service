@@ -124,7 +124,7 @@ func (b BitsImageManager) GetManifest(string, string) ([]byte, error) {
 	// 1. laden aus dem filesystem
 	// 2. generate the sha256 of rootfs tar
 	// 3. get the size of the rootfs archive
-	rootfs, err := os.Open("assets/cflinuxfs2-rootfs.tar.gzip")
+	rootfs, err := os.Open("assets/eirinifs.tar")
 	if err != nil {
 		fmt.Printf("Error open rootfs: %v\n", err)
 		return nil, err
