@@ -63,6 +63,7 @@ func (m ImageHandler) ServeManifest(w http.ResponseWriter, r *http.Request) {
 
 	manifest, err := m.imageManager.GetManifest(name, tag)
 	if err != nil {
+		fmt.Printf("GetManifest Error: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("could not receive manifest"))
 	}
@@ -106,6 +107,7 @@ func (b BitsImageManager) GetManifest(string, string) ([]byte, error) {
 	ociDropletName, err := preFixDroplet("example_droplet")
 	defer os.Remove(ociDropletName)
 	if err != nil {
+		fmt.Printf("preFixDroplet Error: %v\n", err)
 		return nil, err
 	}
 	dropletSHA := getSHA256(ociDropletName)
@@ -124,6 +126,7 @@ func (b BitsImageManager) GetManifest(string, string) ([]byte, error) {
 
 	dropletSize, err := getFileSize(ociDropletName)
 	if err != nil {
+		fmt.Printf("getFileSize Error: %v\n", err)
 		return nil, err
 	}
 
@@ -157,6 +160,7 @@ func (b BitsImageManager) GetManifest(string, string) ([]byte, error) {
 
 	json, err := json.Marshal(manifest)
 	if err != nil {
+		fmt.Printf("Marshal Error: %v\n", err)
 		return nil, err
 	}
 

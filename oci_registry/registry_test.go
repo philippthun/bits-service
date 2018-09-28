@@ -173,6 +173,7 @@ var _ = Describe("Registry", func() {
 		})
 		It("should return a valid manifest JSON", func() {
 			res, err = http.Get(fakeServer.URL + url)
+			fmt.Println(fakeServer.URL + url)
 			Expect(err).NotTo(HaveOccurred())
 			defer res.Body.Close()
 			content, _ := ioutil.ReadAll(res.Body)

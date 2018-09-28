@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/cloudfoundry-incubator/bits-service"
@@ -49,8 +48,8 @@ func SetUpAllRoutes(privateHost, publicHost string, basicAuthMiddleware *middlew
 	SetUpBuildpackCacheRoutes(publicRouter, buildpackCacheHandler)
 
 	// Insert Image Handler
-	internalRouter.Path("/v2/info").HandlerFunc(APIVersion)
-	//API Handler
+	registry.AddImageHandler(internalRouter, registry.BitsImageManager{})
+	// Insert API Handler
 	registry.AddAPIVersionHandler(internalRouter)
 
 	rootRouter.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -136,10 +135,4 @@ func delegateWithQueryParamsExtractedTo(delegate func(http.ResponseWriter, *http
 		mux.Vars(request)["verb"] = request.URL.Query().Get("verb")
 		delegate(responseWriter, request, mux.Vars(request))
 	}
-}
-
-///delete
-func APIVersion(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "/v2/info\n")
-	w.WriteHeader(http.StatusOK)
 }
