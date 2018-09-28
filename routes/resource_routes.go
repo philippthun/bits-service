@@ -1,13 +1,15 @@
 package routes
 
 import (
+	"fmt"
 	"net/http"
 
-	"github.com/gorilla/mux"
 	"github.com/cloudfoundry-incubator/bits-service"
 	"github.com/cloudfoundry-incubator/bits-service/blobstores/local"
 	"github.com/cloudfoundry-incubator/bits-service/middlewares"
+	registry "github.com/cloudfoundry-incubator/bits-service/oci_registry"
 	"github.com/cloudfoundry-incubator/bits-service/util"
+	"github.com/gorilla/mux"
 	"github.com/urfave/negroni"
 )
 
@@ -45,6 +47,15 @@ func SetUpAllRoutes(privateHost, publicHost string, basicAuthMiddleware *middlew
 	SetUpBuildpackRoutes(publicRouter, buildpackHandler)
 	SetUpDropletRoutes(publicRouter, dropletHandler)
 	SetUpBuildpackCacheRoutes(publicRouter, buildpackCacheHandler)
+
+	// Insert Image Handler
+	apiMux := mux.NewRouter()
+	apiMux.HandleFunc("/v2/info", APIVersion)
+	// fmt.Printf("apihandler %v %T", apiHandler, apiHandler)
+	rootRouter.Host("0.0.0.0").Handler(apiMux)
+	rootRouter.Handle("/v2/info", apiMux)
+	//API Handler
+	rootRouter.Handle("/v2/", registry.NewAPIVersionHandler())
 
 	rootRouter.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
@@ -129,4 +140,10 @@ func delegateWithQueryParamsExtractedTo(delegate func(http.ResponseWriter, *http
 		mux.Vars(request)["verb"] = request.URL.Query().Get("verb")
 		delegate(responseWriter, request, mux.Vars(request))
 	}
+}
+
+///delete
+func APIVersion(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "/v2/info\n")
+	w.WriteHeader(http.StatusOK)
 }
