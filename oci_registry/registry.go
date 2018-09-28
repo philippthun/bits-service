@@ -2,10 +2,13 @@ package oci_registry
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"os"
 
 	"github.com/cloudfoundry-incubator/bits-service/oci_registry/models/docker"
 	"github.com/cloudfoundry-incubator/bits-service/oci_registry/models/docker/mediatype"
@@ -89,16 +92,20 @@ type BitsImageManager struct {
 }
 
 func (b BitsImageManager) GetManifest(string, string) ([]byte, error) {
+
+	dropletSHA := getSHA256("example_droplet")
+	fmt.Println(dropletSHA)
+
 	layers := []docker.Content{
 		docker.Content{
-			MediaType: mediatype.ImageRootfsTarGzip, //??
+			MediaType: mediatype.ImageRootfsTarGzip,
 			Digest:    "to be calculated",
 			Size:      42,
 		},
 	}
 
 	config := docker.Content{
-		MediaType: mediatype.ContainerImageJson, //??
+		MediaType: mediatype.ContainerImageJson,
 		Digest:    "to be calculated",
 		Size:      1337,
 	}
@@ -124,4 +131,18 @@ func (b BitsImageManager) GetLayer(string, string) (*bytes.Buffer, error) {
 
 func (b BitsImageManager) Has(digest string) bool {
 	return false
+}
+
+func getSHA256(fileName string) string {
+	f, err := os.Open("assets/" + fileName)
+	if err != nil {
+		fmt.Printf("%v", err)
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		fmt.Printf("%v", err)
+	}
+	return fmt.Sprintf("SHA256:%x", h.Sum(nil))
 }
