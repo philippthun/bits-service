@@ -49,13 +49,9 @@ func SetUpAllRoutes(privateHost, publicHost string, basicAuthMiddleware *middlew
 	SetUpBuildpackCacheRoutes(publicRouter, buildpackCacheHandler)
 
 	// Insert Image Handler
-	apiMux := mux.NewRouter()
-	apiMux.HandleFunc("/v2/info", APIVersion)
-	// fmt.Printf("apihandler %v %T", apiHandler, apiHandler)
-	rootRouter.Host("0.0.0.0").Handler(apiMux)
-	rootRouter.Handle("/v2/info", apiMux)
+	internalRouter.Path("/v2/info").HandlerFunc(APIVersion)
 	//API Handler
-	rootRouter.Handle("/v2/", registry.NewAPIVersionHandler())
+	registry.NewAPIVersionHandler(internalRouter)
 
 	rootRouter.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)

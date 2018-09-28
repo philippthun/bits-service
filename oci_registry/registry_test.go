@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 
+	"github.com/gorilla/mux"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -30,8 +31,9 @@ var _ = Describe("Registry", func() {
 	Context("is running", func() {
 
 		BeforeEach(func() {
-			handler = registry.NewAPIVersionHandler()
-			fakeServer = httptest.NewServer(handler)
+			mux := mux.NewRouter()
+			registry.NewAPIVersionHandler(mux)
+			fakeServer = httptest.NewServer(mux)
 		})
 		It("Serves the /v2 endpoint so that the client skips authentication", func() {
 			res, err := http.Get(fakeServer.URL + "/v2/")

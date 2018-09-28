@@ -38,10 +38,10 @@ func NewImageHandler(imageManager ImageManager) http.Handler {
 	return mux
 }
 
-func NewAPIVersionHandler() http.Handler {
-	mux := mux.NewRouter()
-	mux.Path("/v2/").Methods(http.MethodGet).HandlerFunc(APIVersion)
-	return mux
+func NewAPIVersionHandler(router *mux.Router) {
+	// mux := mux.NewRouter()
+	router.Path("/v2/").Methods(http.MethodGet).HandlerFunc(APIVersion)
+	// return mux
 }
 
 //APIVersion returns HTTP 200 purpously
