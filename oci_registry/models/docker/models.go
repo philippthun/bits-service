@@ -10,5 +10,5 @@ type Manifest struct {
 type Content struct {
 	MediaType string `json: mediaType`
 	Digest    string `json: digest`
-	Size      int    `json: size`
+	Size      int64  `json: size`
 }

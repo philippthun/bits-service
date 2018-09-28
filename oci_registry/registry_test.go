@@ -184,6 +184,8 @@ var _ = Describe("Registry", func() {
 			Expect(manifest.SchemaVersion).To(Equal("v2"))
 			Expect(manifest.Config.MediaType).To(Equal("application/vnd.docker.container.image.v1+json"), "config media type")
 			Expect(manifest.Layers[0].MediaType).To(Equal("application/vnd.docker.image.rootfs.diff.tar.gzip"))
+			Expect(manifest.Layers[1].MediaType).To(Equal("application/vnd.docker.image.rootfs.diff.tar"))
+			Expect(manifest.Layers[1].Size).To(Equal(int64(86134392)))
 		})
 	})
 })
