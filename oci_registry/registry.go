@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/cloudfoundry-incubator/bits-service/oci_registry/models/docker"
@@ -20,6 +21,8 @@ import (
 
 	"github.com/gorilla/mux"
 )
+
+var digestToLayerMap = make(map[string]string)
 
 //go:generate counterfeiter . ImageManager
 type ImageManager interface {
@@ -106,13 +109,12 @@ func (b BitsImageManager) GetManifest(string, string) ([]byte, error) {
 	//3. generate the sha256 of prefixed droplet archive
 	//4. get the size of the prefixed archive
 	ociDropletName, err := preFixDroplet("example_droplet")
-	defer os.Remove(ociDropletName)
+	// defer os.Remove(ociDropletName)
 	if err != nil {
 		fmt.Printf("preFixDroplet Error: %v\n", err)
 		return nil, err
 	}
 	dropletDigest := getSHA256(ociDropletName)
-
 	dropletSize, err := getFileSize(ociDropletName)
 	if err != nil {
 		fmt.Printf("getFileSize Error: %v\n", err)
@@ -141,6 +143,14 @@ func (b BitsImageManager) GetManifest(string, string) ([]byte, error) {
 	if err != nil {
 		fmt.Printf("Config Metadata Error: %v\n", err)
 		return nil, err
+	}
+
+	//store digest->filename for later retrieval
+	digestToLayerMap[strings.Replace(dropletDigest, "sha256:", "", -1)] = ociDropletName
+	digestToLayerMap[strings.Replace(rootfsDigest, "sha256:", "", -1)] = rootfs.Name()
+
+	for k, v := range digestToLayerMap {
+		fmt.Println(k, v)
 	}
 
 	layers := []docker.Content{
@@ -182,19 +192,23 @@ func (b BitsImageManager) GetManifest(string, string) ([]byte, error) {
 
 func (b BitsImageManager) GetLayer(name string, digest string) (*bytes.Buffer, error) {
 	fmt.Printf("GetLayer for name %v with digest: %v", name, digest)
-	layerBits := os.TempDir() + "/" + digest
-	data, err := ioutil.ReadFile(layerBits)
+	fileName := digestToLayerMap[digest]
+
+	data, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		fmt.Printf("Read file : %v\n", err)
 		return nil, err
 	}
-
+	defer os.Remove(fileName)
 	return bytes.NewBuffer(data), nil
 }
 
 func (b BitsImageManager) Has(digest string) bool {
-	layerBits := os.TempDir() + "/" + digest
-	if _, err := os.Stat(layerBits); os.IsNotExist(err) {
+	fileName := digestToLayerMap[digest]
+
+	fmt.Printf("Has, Filenme is ? %v\n", fileName)
+	// layerBits := os.TempDir() + "/" + digest
+	if _, err := os.Stat(fileName); os.IsNotExist(err) {
 		fmt.Printf("Has, file exist Error: %v\n", err)
 		return false
 	}
