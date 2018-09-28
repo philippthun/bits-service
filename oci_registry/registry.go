@@ -100,6 +100,7 @@ type BitsImageManager struct {
 }
 
 func (b BitsImageManager) GetManifest(string, string) ([]byte, error) {
+	// Droplet
 	//1. load droplet from filesystem
 	//2. prefix the droplet archive with /home/vcap
 	//3. generate the sha256 of prefixed droplet archive
@@ -113,20 +114,26 @@ func (b BitsImageManager) GetManifest(string, string) ([]byte, error) {
 	dropletSHA := getSHA256(ociDropletName)
 	fmt.Println(dropletSHA)
 
-	// dropFile, err := os.Open(ociDropletName)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// dropFile.Stat()
-	// dropFileInfo, err := dropFile.Stat()
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// fmt.Printf("The file is %d bytes long\n", dropFileInfo.Size())
-
 	dropletSize, err := getFileSize(ociDropletName)
 	if err != nil {
 		fmt.Printf("getFileSize Error: %v\n", err)
+		return nil, err
+	}
+
+	// Rootfs
+	// 1. laden aus dem filesystem
+	// 2. generate the sha256 of rootfs tar
+	// 3. get the size of the rootfs archive
+	rootfs, err := os.Open("assets/cflinuxfs2-rootfs.tar.gzip")
+	if err != nil {
+		fmt.Printf("Error open rootfs: %v\n", err)
+		return nil, err
+	}
+	rootfsDigest := getSHA256(rootfs.Name())
+
+	rootfsSize, err := getFileSize(rootfs.Name())
+	if err != nil {
+		fmt.Printf("rootfsSize Error: %v\n", err)
 		return nil, err
 	}
 
@@ -134,8 +141,8 @@ func (b BitsImageManager) GetManifest(string, string) ([]byte, error) {
 		docker.Content{
 			//Rootfs
 			MediaType: mediatype.ImageRootfsTarGzip,
-			Digest:    "to be calculated",
-			Size:      42,
+			Digest:    rootfsDigest,
+			Size:      rootfsSize,
 		},
 		docker.Content{
 			//Droplet
