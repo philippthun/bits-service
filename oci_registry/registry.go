@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -181,12 +180,26 @@ func (b BitsImageManager) GetManifest(string, string) ([]byte, error) {
 	return json, nil
 }
 
-func (b BitsImageManager) GetLayer(string, string) (*bytes.Buffer, error) {
-	return nil, errors.New("unimplemented")
+func (b BitsImageManager) GetLayer(name string, digest string) (*bytes.Buffer, error) {
+	fmt.Printf("GetLayer for name %v with digest: %v", name, digest)
+	layerBits := os.TempDir() + "/" + digest
+	data, err := ioutil.ReadFile(layerBits)
+	if err != nil {
+		fmt.Printf("Read file : %v\n", err)
+		return nil, err
+	}
+
+	return bytes.NewBuffer(data), nil
 }
 
 func (b BitsImageManager) Has(digest string) bool {
-	return false
+	layerBits := os.TempDir() + "/" + digest
+	if _, err := os.Stat(layerBits); os.IsNotExist(err) {
+		fmt.Printf("Has, file exist Error: %v\n", err)
+		return false
+	}
+
+	return true
 }
 
 func getSHA256(fileName string) string {
@@ -201,7 +214,7 @@ func getSHA256(fileName string) string {
 	if _, err := io.Copy(h, f); err != nil {
 		fmt.Printf("%v\n", err)
 	}
-	return fmt.Sprintf("sha256:%x\n", h.Sum(nil))
+	return fmt.Sprintf("sha256:%x", h.Sum(nil))
 }
 
 func preFixDroplet(fileName string) (string, error) {
