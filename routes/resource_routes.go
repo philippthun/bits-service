@@ -51,7 +51,7 @@ func SetUpAllRoutes(privateHost, publicHost string, basicAuthMiddleware *middlew
 	// Insert Image Handler
 	internalRouter.Path("/v2/info").HandlerFunc(APIVersion)
 	//API Handler
-	registry.NewAPIVersionHandler(internalRouter)
+	registry.AddAPIVersionHandler(internalRouter)
 
 	rootRouter.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)

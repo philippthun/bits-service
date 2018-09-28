@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/cloudfoundry-incubator/bits-service/oci_registry/models/docker"
 	"github.com/cloudfoundry-incubator/bits-service/oci_registry/models/docker/mediatype"
@@ -30,16 +31,16 @@ type ImageHandler struct {
 type APIVersionHandler struct {
 }
 
-func NewImageHandler(imageManager ImageManager) http.Handler {
-	mux := mux.NewRouter()
+func AddImageHandler(router *mux.Router, imageManager ImageManager) {
+
 	imageHandler := ImageHandler{imageManager}
-	mux.Path("/v2/{name:[a-z0-9/\\.\\-_]+}/manifest/{tag}").Methods(http.MethodGet).HandlerFunc(imageHandler.ServeManifest)
-	mux.Path("/v2/{name:[a-z0-9/\\.\\-_]+}/blobs/{digest}").Methods(http.MethodGet).HandlerFunc(imageHandler.ServeLayer)
-	return mux
+	router.Path("/v2/{name:[a-z0-9/\\.\\-_]+}/manifest/{tag}").Methods(http.MethodGet).HandlerFunc(imageHandler.ServeManifest)
+	router.Path("/v2/{name:[a-z0-9/\\.\\-_]+}/blobs/{digest}").Methods(http.MethodGet).HandlerFunc(imageHandler.ServeLayer)
 }
 
-func NewAPIVersionHandler(router *mux.Router) {
+func AddAPIVersionHandler(router *mux.Router) {
 	// mux := mux.NewRouter()
+	router.Path("/v2").Methods(http.MethodGet).HandlerFunc(APIVersion)
 	router.Path("/v2/").Methods(http.MethodGet).HandlerFunc(APIVersion)
 	// return mux
 }
@@ -47,6 +48,8 @@ func NewAPIVersionHandler(router *mux.Router) {
 //APIVersion returns HTTP 200 purpously
 func APIVersion(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
+	fmt.Printf("[%s]\tReceived Ping\n", time.Now().Format(time.RFC3339))
+	fmt.Fprintf(w, "Pong")
 }
 
 func (m ImageHandler) ServeManifest(w http.ResponseWriter, r *http.Request) {

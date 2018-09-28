@@ -22,7 +22,6 @@ var _ = Describe("Registry", func() {
 	var (
 		fakeServer   *httptest.Server
 		imageManager *oci_registryfakes.FakeImageManager
-		handler      http.Handler
 		url          string
 		res          *http.Response
 		err          error
@@ -31,9 +30,9 @@ var _ = Describe("Registry", func() {
 	Context("is running", func() {
 
 		BeforeEach(func() {
-			mux := mux.NewRouter()
-			registry.NewAPIVersionHandler(mux)
-			fakeServer = httptest.NewServer(mux)
+			router := mux.NewRouter()
+			registry.AddAPIVersionHandler(router)
+			fakeServer = httptest.NewServer(router)
 		})
 		It("Serves the /v2 endpoint so that the client skips authentication", func() {
 			res, err := http.Get(fakeServer.URL + "/v2/")
@@ -46,8 +45,9 @@ var _ = Describe("Registry", func() {
 
 		BeforeEach(func() {
 			imageManager = new(oci_registryfakes.FakeImageManager)
-			handler = registry.NewImageHandler(imageManager)
-			fakeServer = httptest.NewServer(handler)
+			router := mux.NewRouter()
+			registry.AddImageHandler(router, imageManager)
+			fakeServer = httptest.NewServer(router)
 		})
 
 		Context("for an image name and tag", func() {
@@ -167,11 +167,11 @@ var _ = Describe("Registry", func() {
 		BeforeEach(func() {
 			url = "/v2/cloudfoundry/manifest/image-tag"
 			imageManager := registry.BitsImageManager{}
-			handler = registry.NewImageHandler(imageManager)
-			fakeServer = httptest.NewServer(handler)
+			router := mux.NewRouter()
+			registry.AddImageHandler(router, imageManager)
+			fakeServer = httptest.NewServer(router)
 		})
 		It("should return a valid manifest JSON", func() {
-			//fmt.Printf("url: %v", url)
 			res, err = http.Get(fakeServer.URL + url)
 			Expect(err).NotTo(HaveOccurred())
 			defer res.Body.Close()
