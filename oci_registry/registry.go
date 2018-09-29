@@ -42,6 +42,7 @@ func AddImageHandler(router *mux.Router, imageManager ImageManager) {
 
 	imageHandler := ImageHandler{imageManager}
 	router.Path("/v2/{name:[a-z0-9/\\.\\-_]+}/manifest/{tag}").Methods(http.MethodGet).HandlerFunc(imageHandler.ServeManifest)
+	router.Path("/v2/{space}/{name}/manifests/{tag}").Methods(http.MethodGet).HandlerFunc(imageHandler.ServeManifest)
 	router.Path("/v2/{name:[a-z0-9/\\.\\-_]+}/blobs/{digest}").Methods(http.MethodGet).HandlerFunc(imageHandler.ServeLayer)
 }
 
@@ -176,7 +177,7 @@ func (b BitsImageManager) GetManifest(string, string) ([]byte, error) {
 
 	manifest := docker.Manifest{
 		MediaType:     mediatype.DistributionManifestJson,
-		SchemaVersion: "v2",
+		SchemaVersion: 2,
 		Config:        config,
 		Layers:        layers,
 	}
@@ -192,7 +193,7 @@ func (b BitsImageManager) GetManifest(string, string) ([]byte, error) {
 
 func (b BitsImageManager) GetLayer(name string, digest string) (*bytes.Buffer, error) {
 	fmt.Printf("GetLayer for name %v with digest: %v", name, digest)
-	fileName := digestToLayerMap[digest]
+	fileName := digestToLayerMap[strings.Replace(digest, "sha256:", "", -1)]
 
 	data, err := ioutil.ReadFile(fileName)
 	if err != nil {
@@ -204,7 +205,7 @@ func (b BitsImageManager) GetLayer(name string, digest string) (*bytes.Buffer, e
 }
 
 func (b BitsImageManager) Has(digest string) bool {
-	fileName := digestToLayerMap[digest]
+	fileName := digestToLayerMap[strings.Replace(digest, "sha256:", "", -1)]
 
 	fmt.Printf("Has, Filenme is ? %v\n", fileName)
 	// layerBits := os.TempDir() + "/" + digest

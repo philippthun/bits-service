@@ -179,10 +179,10 @@ var _ = Describe("Registry", func() {
 			content, _ := ioutil.ReadAll(res.Body)
 			var manifest docker.Manifest
 			err := json.Unmarshal(content, &manifest)
-			fmt.Printf(manifest.SchemaVersion)
+			fmt.Printf("schemaVersion: %v", manifest.SchemaVersion)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(manifest.MediaType).To(Equal("application/vnd.docker.distribution.manifest.v2+json"), "manifest media type")
-			Expect(manifest.SchemaVersion).To(Equal("v2"))
+			Expect(manifest.SchemaVersion).To(Equal(2))
 			Expect(manifest.Config.MediaType).To(Equal("application/vnd.docker.container.image.v1+json"), "config media type")
 			Expect(manifest.Layers[0].MediaType).To(Equal("application/vnd.docker.image.rootfs.diff.tar.gzip"))
 			Expect(manifest.Layers[1].MediaType).To(Equal("application/vnd.docker.image.rootfs.diff.tar"))
