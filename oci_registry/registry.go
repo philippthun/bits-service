@@ -23,8 +23,15 @@ import (
 )
 
 var digestToLayerMap = make(map[string]string)
+var stored = &bytes.Buffer{}
 
 //go:generate counterfeiter . ImageManager
+// type ImageManager interface {
+// 	GetManifest(string, string) ([]byte, error)
+// 	GetLayer(string, string) ([]byte, error)
+// 	Has(digest string) bool
+// }
+
 type ImageManager interface {
 	GetManifest(string, string) ([]byte, error)
 	GetLayer(string, string) (*bytes.Buffer, error)
@@ -78,22 +85,36 @@ func (m ImageHandler) ServeManifest(w http.ResponseWriter, r *http.Request) {
 func (m ImageHandler) ServeLayer(w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 	digest := mux.Vars(r)["digest"]
+	// w.WriteHeader(http.StatusOK)
+	if digestToLayerMap[strings.Replace(digest, "sha256:", "", -1)] == "CONFIGLAYER" {
+		fmt.Printf("DEBUG: serve config lyaer!\n")
 
+		_, err := io.Copy(w, stored) //layer has to be an io.writer ???
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("failed to stream layer"))
+		}
+		return
+	}
 	if ok := m.imageManager.Has(digest); !ok {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("requested layer not found"))
 		return
 	}
-
+	fmt.Printf("DEBUG: File exist!\n")
 	layer, err := m.imageManager.GetLayer(name, digest)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("could not receive layer"))
 		return
 	}
+	fmt.Printf("DEBUG: Sucessfully load from Filesystem!\n")
 
-	w.WriteHeader(http.StatusOK)
-	_, err = io.Copy(w, layer)
+	_, err = io.Copy(w, layer) //layer has to be an io.writer ???
+
+	fmt.Printf("DEBUG: Sucessfully copy into the writer! %v\n", w.Header())
+
+	fmt.Printf("DEBUG: write status ok!\n")
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("failed to stream layer"))
@@ -151,7 +172,7 @@ func (b BitsImageManager) GetManifest(string, string) ([]byte, error) {
 	digestToLayerMap[strings.Replace(rootfsDigest, "sha256:", "", -1)] = rootfs.Name()
 
 	for k, v := range digestToLayerMap {
-		fmt.Println(k, v)
+		fmt.Printf("digest: %v filename: %v\n", k, v)
 	}
 
 	layers := []docker.Content{
@@ -200,7 +221,7 @@ func (b BitsImageManager) GetLayer(name string, digest string) (*bytes.Buffer, e
 		fmt.Printf("Read file : %v\n", err)
 		return nil, err
 	}
-	defer os.Remove(fileName)
+	// defer os.Remove(fileName) //TODO
 	return bytes.NewBuffer(data), nil
 }
 
@@ -302,13 +323,13 @@ func getConfigMetaData(rootfsDigest string, dropletDigest string) (string, int64
 	})
 	buf := bytes.NewReader(config)
 	sum := sha256.New()
-	stored := &bytes.Buffer{}
+	// stored := &bytes.Buffer{}
 	var size int64
 	if size, err = io.Copy(io.MultiWriter(sum, stored), buf); err != nil {
 		return "", 0, err
 	}
 
 	digest := "sha256:" + hex.EncodeToString(sum.Sum(nil))
-
+	digestToLayerMap[strings.Replace(digest, "sha256:", "", -1)] = "CONFIGLAYER"
 	return digest, size, nil
 }
