@@ -47,10 +47,15 @@ func SetUpAllRoutes(privateHost, publicHost string, basicAuthMiddleware *middlew
 	SetUpDropletRoutes(publicRouter, dropletHandler)
 	SetUpBuildpackCacheRoutes(publicRouter, buildpackCacheHandler)
 
-	// Insert Image Handler
-	registry.AddImageHandler(internalRouter, registry.BitsImageManager{})
-	// Insert API Handler
-	registry.AddAPIVersionHandler(internalRouter)
+	// // Insert Image Handler
+	// registry.AddImageHandler(internalRouter, registry.BitsImageManager{})
+	// // Insert API Handler
+	// registry.AddAPIVersionHandler(internalRouter)
+
+	ociRouter := mux.NewRouter()
+	rootRouter.PathPrefix("/v2").Handler(ociRouter)
+	registry.AddAPIVersionHandler(ociRouter)
+	registry.AddImageHandler(ociRouter, registry.BitsImageManager{})
 
 	rootRouter.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
