@@ -80,13 +80,13 @@ var _ = Describe("Accessing the bits-service", func() {
 	})
 
 	Context("through public host", func() {
-		It("returns http.StatusForbidden when accessing package through public host without md5", func() {
+		It("returns http.StatusForbidden when accessing package through public host without hash", func() {
 			Expect(client.Get("https://public.127.0.0.1.nip.io:4443/packages/notexistent")).
 				To(WithTransform(GetStatusCode, Equal(http.StatusForbidden)))
 		})
 
 		Context("After retrieving a signed URL", func() {
-			It("returns http.StatusOK when accessing package through public host with md5", func() {
+			It("returns http.StatusOK when accessing package through public host with hash", func() {
 				request, e := httputil.NewPutRequest("https://internal.127.0.0.1.nip.io:4443/packages/myguid", map[string]map[string]io.Reader{
 					"package": map[string]io.Reader{"somefilename": CreateZip(map[string]string{"somefile": "lalala\n\n"})},
 				})

@@ -50,7 +50,7 @@ var _ = Describe("Signing URLs", func() {
 		// signing
 		responseBody := handler.Sign("path", "get", mockClock.Now().Add(1*time.Hour))
 
-		Expect(responseBody).To(ContainSubstring("http://example.com/my/path?md5="))
+		Expect(responseBody).To(ContainSubstring("http://example.com/my/path?hash="))
 		Expect(responseBody).To(ContainSubstring("expires"))
 
 		// verifying
@@ -71,7 +71,7 @@ var _ = Describe("Signing URLs", func() {
 		// signing
 		responseBody := handler.Sign("path", "get", mockClock.Now().Add(1*time.Hour))
 
-		Expect(responseBody).To(ContainSubstring("http://example.com/my/path?md5="))
+		Expect(responseBody).To(ContainSubstring("http://example.com/my/path?hash="))
 		Expect(responseBody).To(ContainSubstring("expires"))
 
 		mockClock.Add(longerThanExpirationDuration)

@@ -14,7 +14,7 @@ type SignatureVerificationMiddleware struct {
 }
 
 func (middleware *SignatureVerificationMiddleware) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request, next http.HandlerFunc) {
-	if request.URL.Query().Get("md5") == "" {
+	if request.URL.Query().Get("hash") == "" {
 		responseWriter.WriteHeader(403)
 		return
 	}

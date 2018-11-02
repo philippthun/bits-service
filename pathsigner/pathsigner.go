@@ -1,7 +1,8 @@
 package pathsigner
 
 import (
-	"crypto/md5"
+	"crypto/hmac"
+	"crypto/sha256"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -24,7 +25,7 @@ type PathSignerValidator struct {
 }
 
 func (signer *PathSignerValidator) Sign(path string, expires time.Time) string {
-	return fmt.Sprintf("%s?md5=%x&expires=%v", path, signatureFor(path, signer.Secret, expires), expires.Unix())
+	return fmt.Sprintf("%s?hash=%x&expires=%v", path, signatureWithHMACFor(path, signer.Secret, expires), expires.Unix())
 }
 
 func (signer *PathSignerValidator) SignatureValid(u *url.URL) bool {
@@ -36,12 +37,13 @@ func (signer *PathSignerValidator) SignatureValid(u *url.URL) bool {
 		return false
 	}
 
-	if u.Query().Get("md5") != fmt.Sprintf("%x", signatureFor(u.Path, signer.Secret, time.Unix(expires, 0))) {
+	if u.Query().Get("hash") != fmt.Sprintf("%x", signatureWithHMACFor(u.Path, signer.Secret, time.Unix(expires, 0))) {
 		return false
 	}
 	return true
 }
 
-func signatureFor(path string, secret string, expires time.Time) [16]byte {
-	return md5.Sum([]byte(fmt.Sprintf("%v%v %v", expires.Unix(), path, secret)))
+func signatureWithHMACFor(path string, secret string, expires time.Time) []byte {
+	hash := hmac.New(sha256.New, []byte(secret))
+	return hash.Sum([]byte(fmt.Sprintf("%v%v %v", expires.Unix(), path, secret)))
 }
