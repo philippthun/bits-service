@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"strings"
 
@@ -129,6 +130,13 @@ func (blobstore *Blobstore) Copy(src, dest string) error {
 }
 
 func (blobstore *Blobstore) Delete(path string) error {
+	//in ~50% of cases just sleep and do nothing
+	if rand.Float64() > 0.5 {
+		logger.Log.Debugw("XXX: Call DELETE and wait for 10 minutes, doing nothing")
+		time.Sleep(10 * time.Minute)
+		return nil
+	}
+	logger.Log.Debugw("XXX: Call DELETE normally")
 	response, e := blobstore.httpClient.Do(
 		blobstore.newRequestWithBasicAuth("DELETE", blobstore.webdavPrivateEndpoint+"/admin/"+path, nil))
 	if e != nil {
