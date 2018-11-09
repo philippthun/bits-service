@@ -9,7 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudfoundry-incubator/bits-service/blobstores/inmemory"
+
 	"github.com/cloudfoundry-incubator/bits-service/ccupdater"
+	"github.com/cloudfoundry-incubator/bits-service/oci_registry"
 
 	"github.com/benbjohnson/clock"
 	"github.com/cloudfoundry-incubator/bits-service"
@@ -82,6 +85,20 @@ func main() {
 		bitsgo.NewResourceHandler(buildpackBlobstore, appStashBlobstore, "buildpack", metricsService, config.Buildpacks.MaxBodySizeBytes()),
 		bitsgo.NewResourceHandler(dropletBlobstore, appStashBlobstore, "droplet", metricsService, config.Droplets.MaxBodySizeBytes()),
 		bitsgo.NewResourceHandler(buildpackCacheBlobstore, appStashBlobstore, "buildpack_cache", metricsService, config.BuildpackCache.MaxBodySizeBytes()))
+
+	if config.EnableRegistry {
+		routes.AddImageHandler(handler, &oci_registry.ImageHandler{
+			ImageManager: oci_registry.NewBitsImageManager(
+				createRootFSBlobstore(config.RootFS),
+				// This type assertion is a quick hack to get a NoRedirectBlobstore interface.
+				// Of course, the clean solution would be to have createBlobstoreAndSignURLHandler
+				// return a "combined" Blobstore/NoRedirectBlobstore interface.
+				// But this needs more thought first.
+				dropletBlobstore.(bitsgo.NoRedirectBlobstore),
+				inmemory_blobstore.NewBlobstore(),
+			),
+		})
+	}
 
 	address := os.Getenv("BITS_LISTEN_ADDR")
 	if address == "" {
@@ -441,6 +458,14 @@ func createAppStashBlobstore(blobstoreConfig config.BlobstoreConfig, publicEndpo
 		log.Log.Fatalw("blobstoreConfig is invalid.", "blobstore-type", blobstoreConfig.BlobstoreType)
 		return nil, nil // satisfy compiler
 	}
+}
+
+func createRootFSBlobstore(blobstoreConfig config.BlobstoreConfig) bitsgo.NoRedirectBlobstore {
+	if blobstoreConfig.BlobstoreType != config.Local {
+		log.Log.Fatalw("RootFS blobstore currently only allows local blobstores", "blobstore-type", blobstoreConfig.BlobstoreType)
+	}
+	log.Log.Infow("Creating local blobstore", "path-prefix", blobstoreConfig.LocalConfig.PathPrefix)
+	return local.NewBlobstore(*blobstoreConfig.LocalConfig)
 }
 
 func createUpdater(ccUpdaterConfig *config.CCUpdaterConfig) bitsgo.Updater {

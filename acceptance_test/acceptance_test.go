@@ -35,6 +35,12 @@ var _ = Describe("Accessing the bits-service", func() {
 	)
 
 	BeforeSuite(func() {
+		err := os.MkdirAll("/tmp/eirinifs/assets", 0755)
+		Ω(err).ShouldNot(HaveOccurred())
+		file, err := os.Create("/tmp/eirinifs/assets/eirinifs.tar")
+		Ω(err).ShouldNot(HaveOccurred())
+		file.Close()
+
 		pathToWebserver, err := gexec.Build("github.com/cloudfoundry-incubator/bits-service/cmd/bitsgo")
 		Ω(err).ShouldNot(HaveOccurred())
 
@@ -58,6 +64,7 @@ var _ = Describe("Accessing the bits-service", func() {
 			session.Kill()
 		}
 		gexec.CleanupBuildArtifacts()
+		os.Remove("/tmp/eirinifs/assets/eirinifs.tar")
 	})
 
 	Context("through private host", func() {

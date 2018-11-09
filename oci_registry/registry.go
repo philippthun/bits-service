@@ -7,309 +7,193 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
-	"time"
+
+	"github.com/pkg/errors"
+
+	"github.com/cloudfoundry-incubator/bits-service"
 
 	"github.com/cloudfoundry-incubator/bits-service/oci_registry/models/docker"
 	"github.com/cloudfoundry-incubator/bits-service/oci_registry/models/docker/mediatype"
+	"github.com/cloudfoundry-incubator/bits-service/util"
 
 	"github.com/gorilla/mux"
 )
 
-var digestToLayerMap = make(map[string]string)
-var stored = &bytes.Buffer{}
-
-//go:generate counterfeiter . ImageManager
-// type ImageManager interface {
-// 	GetManifest(string, string) ([]byte, error)
-// 	GetLayer(string, string) ([]byte, error)
-// 	Has(digest string) bool
-// }
-
-type ImageManager interface {
-	GetManifest(string, string) ([]byte, error)
-	GetLayer(string, string) (*bytes.Buffer, error)
-	Has(digest string) bool
-}
-
 type ImageHandler struct {
-	imageManager ImageManager //ggf *ImageManager (need to adjust the functions accordingly)
+	ImageManager *BitsImageManager
 }
 
-type APIVersionHandler struct {
+func (m *ImageHandler) ServeAPIVersion(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("Pong"))
 }
 
-func AddImageHandler(router *mux.Router, imageManager ImageManager) {
+func (m *ImageHandler) ServeManifest(w http.ResponseWriter, r *http.Request) {
+	manifest := m.ImageManager.GetManifest(mux.Vars(r)["name"], mux.Vars(r)["tag"])
 
-	imageHandler := ImageHandler{imageManager}
-	router.Path("/v2/{name:[a-z0-9/\\.\\-_]+}/manifest/{tag}").Methods(http.MethodGet).HandlerFunc(imageHandler.ServeManifest)
-	router.Path("/v2/{space}/{name}/manifests/{tag}").Methods(http.MethodGet).HandlerFunc(imageHandler.ServeManifest)
-	router.Path("/v2/{name:[a-z0-9/\\.\\-_]+}/blobs/{digest}").Methods(http.MethodGet).HandlerFunc(imageHandler.ServeLayer)
-}
-
-func AddAPIVersionHandler(router *mux.Router) {
-	// mux := mux.NewRouter()
-	router.Path("/v2").Methods(http.MethodGet).HandlerFunc(APIVersion)
-	router.Path("/v2/").Methods(http.MethodGet).HandlerFunc(APIVersion)
-	// return mux
-}
-
-//APIVersion returns HTTP 200 purpously
-func APIVersion(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	fmt.Printf("[%s]\tReceived Ping\n", time.Now().Format(time.RFC3339))
-	fmt.Fprintf(w, "Pong")
-}
-
-func (m ImageHandler) ServeManifest(w http.ResponseWriter, r *http.Request) {
-	tag := mux.Vars(r)["tag"]
-	name := mux.Vars(r)["name"]
-	w.Header().Add("Content-Type", "application/vnd.docker.distribution.manifest.v2+json")
-
-	manifest, err := m.imageManager.GetManifest(name, tag)
-	if err != nil {
-		fmt.Printf("GetManifest Error: %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("could not receive manifest"))
+	if manifest == nil {
+		http.NotFound(w, r)
+		return
 	}
-
+	w.Header().Add("Content-Type", "application/vnd.docker.distribution.manifest.v2+json")
 	w.Write(manifest)
 }
 
-func (m ImageHandler) ServeLayer(w http.ResponseWriter, r *http.Request) {
-	name := mux.Vars(r)["name"]
-	digest := mux.Vars(r)["digest"]
-	// w.WriteHeader(http.StatusOK)
-	if digestToLayerMap[strings.Replace(digest, "sha256:", "", -1)] == "CONFIGLAYER" {
-		fmt.Printf("DEBUG: serve config lyaer!\n")
+func (m *ImageHandler) ServeLayer(w http.ResponseWriter, r *http.Request) {
+	layer := m.ImageManager.GetLayer(mux.Vars(r)["name"], mux.Vars(r)["digest"])
 
-		_, err := io.Copy(w, stored) //layer has to be an io.writer ???
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("failed to stream layer"))
-		}
+	if layer == nil {
+		http.NotFound(w, r)
 		return
 	}
-	if ok := m.imageManager.Has(digest); !ok {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("requested layer not found"))
-		return
-	}
-	fmt.Printf("DEBUG: File exist!\n")
-	layer, err := m.imageManager.GetLayer(name, digest)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("could not receive layer"))
-		return
-	}
-	fmt.Printf("DEBUG: Sucessfully load from Filesystem!\n")
 
-	_, err = io.Copy(w, layer) //layer has to be an io.writer ???
+	_, e := io.Copy(w, layer)
 
-	fmt.Printf("DEBUG: Sucessfully copy into the writer! %v\n", w.Header())
-
-	fmt.Printf("DEBUG: write status ok!\n")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("failed to stream layer"))
-	}
+	util.PanicOnError(errors.WithStack(e))
 }
 
 type BitsImageManager struct {
+	rootFSBlobstore   bitsgo.NoRedirectBlobstore
+	dropletBlobstore  bitsgo.NoRedirectBlobstore
+	digestLookupStore bitsgo.NoRedirectBlobstore
+	rootfsSize        int64
+	rootfsDigest      string
 }
 
-func (b BitsImageManager) GetManifest(string, string) ([]byte, error) {
-	// Droplet
-	//1. load droplet from filesystem
-	//2. prefix the droplet archive with /home/vcap
-	//3. generate the sha256 of prefixed droplet archive
-	//4. get the size of the prefixed archive
-	ociDropletName, err := preFixDroplet("example_droplet")
-	// defer os.Remove(ociDropletName)
-	if err != nil {
-		fmt.Printf("preFixDroplet Error: %v\n", err)
-		return nil, err
-	}
-	dropletDigest := getSHA256(ociDropletName)
-	dropletSize, err := getFileSize(ociDropletName)
-	if err != nil {
-		fmt.Printf("getFileSize Error: %v\n", err)
-		return nil, err
-	}
+func NewBitsImageManager(
+	rootFSBlobstore bitsgo.NoRedirectBlobstore,
+	dropletBlobstore bitsgo.NoRedirectBlobstore,
+	digestLookupStore bitsgo.NoRedirectBlobstore) *BitsImageManager {
 
-	// Rootfs
-	// 1. laden aus dem filesystem
-	// 2. generate the sha256 of rootfs tar
-	// 3. get the size of the rootfs archive
-	rootfs, err := os.Open("assets/eirinifs.tar")
-	if err != nil {
-		fmt.Printf("Error open rootfs: %v\n", err)
-		return nil, err
+	rootfsReader, e := rootFSBlobstore.Get("assets/eirinifs.tar")
+	util.PanicOnError(errors.WithStack(e))
+	rootfsDigest, rootfsSize := shaAndSize(rootfsReader)
+
+	return &BitsImageManager{
+		rootFSBlobstore:   rootFSBlobstore,
+		dropletBlobstore:  dropletBlobstore,
+		digestLookupStore: digestLookupStore,
+		rootfsSize:        rootfsSize,
+		rootfsDigest:      rootfsDigest,
 	}
-	rootfsDigest := getSHA256(rootfs.Name())
+}
 
-	rootfsSize, err := getFileSize(rootfs.Name())
-	if err != nil {
-		fmt.Printf("rootfsSize Error: %v\n", err)
-		return nil, err
+// NOTE: name is currently not used.
+func (b *BitsImageManager) GetManifest(name string, tag string) []byte {
+	dropletGUID := tag
+	dropletReader, e := b.dropletBlobstore.Get(dropletGUID)
+
+	if _, notFound := e.(*bitsgo.NotFoundError); notFound {
+		return nil
 	}
+	util.PanicOnError(errors.WithStack(e))
+	defer dropletReader.Close()
 
-	// Config
-	configDigest, configSize, err := getConfigMetaData(rootfsDigest, dropletDigest)
-	if err != nil {
-		fmt.Printf("Config Metadata Error: %v\n", err)
-		return nil, err
-	}
+	ociDropletFile, e := ioutil.TempFile("", "oci-droplet")
+	util.PanicOnError(errors.WithStack(e))
 
-	//store digest->filename for later retrieval
-	digestToLayerMap[strings.Replace(dropletDigest, "sha256:", "", -1)] = ociDropletName
-	digestToLayerMap[strings.Replace(rootfsDigest, "sha256:", "", -1)] = rootfs.Name()
+	defer os.Remove(ociDropletFile.Name())
+	defer ociDropletFile.Close()
 
-	for k, v := range digestToLayerMap {
-		fmt.Printf("digest: %v filename: %v\n", k, v)
-	}
+	preFixDroplet(dropletReader, ociDropletFile)
 
-	layers := []docker.Content{
-		docker.Content{
-			//Rootfs
-			MediaType: mediatype.ImageRootfsTarGzip,
-			Digest:    rootfsDigest,
-			Size:      rootfsSize,
-		},
-		docker.Content{
-			//Droplet
-			MediaType: mediatype.ImageRootfsTar,
-			Digest:    dropletDigest,
-			Size:      dropletSize,
-		},
-	}
+	_, e = ociDropletFile.Seek(0, 0)
+	util.PanicOnError(errors.WithStack(e))
 
-	config := docker.Content{
-		MediaType: mediatype.ContainerImageJson,
-		Digest:    configDigest,
-		Size:      configSize,
-	}
+	dropletDigest, dropletSize := shaAndSize(ociDropletFile)
 
-	manifest := docker.Manifest{
+	_, e = ociDropletFile.Seek(0, 0)
+	util.PanicOnError(errors.WithStack(e))
+
+	e = b.digestLookupStore.Put(dropletDigest, ociDropletFile)
+	util.PanicOnError(errors.WithStack(e))
+
+	configJSON := b.configMetadata(b.rootfsDigest, dropletDigest)
+	configDigest, configSize := shaAndSize(bytes.NewReader(configJSON))
+
+	manifestJson, e := json.Marshal(docker.Manifest{
 		MediaType:     mediatype.DistributionManifestJson,
 		SchemaVersion: 2,
-		Config:        config,
-		Layers:        layers,
-	}
+		Config: docker.Content{
+			MediaType: mediatype.ContainerImageJson,
+			Digest:    configDigest,
+			Size:      configSize,
+		},
+		Layers: []docker.Content{
+			docker.Content{
+				MediaType: mediatype.ImageRootfsTarGzip,
+				Digest:    b.rootfsDigest,
+				Size:      b.rootfsSize,
+			},
+			docker.Content{
+				MediaType: mediatype.ImageRootfsTar,
+				Digest:    dropletDigest,
+				Size:      dropletSize,
+			},
+		},
+	})
+	util.PanicOnError(errors.WithStack(e))
 
-	json, err := json.Marshal(manifest)
-	if err != nil {
-		fmt.Printf("Marshal Error: %v\n", err)
-		return nil, err
-	}
+	e = b.digestLookupStore.Put(configDigest, bytes.NewReader(configJSON))
+	util.PanicOnError(errors.WithStack(e))
 
-	return json, nil
+	return manifestJson
 }
 
-func (b BitsImageManager) GetLayer(name string, digest string) (*bytes.Buffer, error) {
-	fmt.Printf("GetLayer for name %v with digest: %v", name, digest)
-	fileName := digestToLayerMap[strings.Replace(digest, "sha256:", "", -1)]
-
-	data, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		fmt.Printf("Read file : %v\n", err)
-		return nil, err
-	}
-	// defer os.Remove(fileName) //TODO
-	return bytes.NewBuffer(data), nil
-}
-
-func (b BitsImageManager) Has(digest string) bool {
-	fileName := digestToLayerMap[strings.Replace(digest, "sha256:", "", -1)]
-
-	fmt.Printf("Has, Filenme is ? %v\n", fileName)
-	// layerBits := os.TempDir() + "/" + digest
-	if _, err := os.Stat(fileName); os.IsNotExist(err) {
-		fmt.Printf("Has, file exist Error: %v\n", err)
-		return false
-	}
-
-	return true
-}
-
-func getSHA256(fileName string) string {
-	fmt.Printf("sha256 convert file: %v\n", fileName)
-	f, err := os.Open(fileName)
-	if err != nil {
-		fmt.Printf("%v\n", err)
-	}
-	defer f.Close()
-
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		fmt.Printf("%v\n", err)
-	}
-	return fmt.Sprintf("sha256:%x", h.Sum(nil))
-}
-
-func preFixDroplet(fileName string) (string, error) {
-
-	cfDroplet, err := os.Open("assets/" + fileName)
-	if err != nil {
-		return "", err
-	}
-	ociDroplet, err := ioutil.TempFile("", "converted-layer")
-	if err != nil {
-		return "", err
-	}
-
+func preFixDroplet(cfDroplet io.Reader, ociDroplet io.Writer) {
 	layer := tar.NewWriter(ociDroplet)
 
-	gz, err := gzip.NewReader(cfDroplet)
-	if err != nil {
-		return "", err
-	}
+	gz, e := gzip.NewReader(cfDroplet)
+	util.PanicOnError(errors.WithStack(e))
 
 	t := tar.NewReader(gz)
 	for {
-		hdr, err := t.Next()
-		if err == io.EOF {
+		hdr, e := t.Next()
+		if e == io.EOF {
 			break
 		}
-
-		if err != nil {
-			return "", err
-		}
+		util.PanicOnError(errors.WithStack(e))
 
 		hdr.Name = filepath.Join("/home/vcap", hdr.Name)
-		layer.WriteHeader(hdr)
-		if _, err := io.Copy(layer, t); err != nil {
-			return "", err
-		}
+		e = layer.WriteHeader(hdr)
+		util.PanicOnError(errors.WithStack(e))
+		_, e = io.Copy(layer, t)
+		util.PanicOnError(errors.WithStack(e))
 	}
-
-	return ociDroplet.Name(), nil
 }
 
-func getFileSize(fileName string) (int64, error) {
-	file, err := os.Open(fileName)
-	if err != nil {
-		return -1, err
-	}
-
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return -1, err
-	}
-	fmt.Printf("The file is %d bytes long\n", fileInfo.Size())
-	return fileInfo.Size(), nil
+func shaAndSize(reader io.Reader) (sha string, size int64) {
+	sha256Hash := sha256.New()
+	configSize, e := io.Copy(sha256Hash, reader)
+	util.PanicOnError(errors.WithStack(e))
+	return "sha256:" + hex.EncodeToString(sha256Hash.Sum([]byte{})), configSize
 }
 
-func getConfigMetaData(rootfsDigest string, dropletDigest string) (string, int64, error) {
+// NOTE: name is currently not used.
+func (b *BitsImageManager) GetLayer(name string, digest string) io.ReadCloser {
+	if "sha256:"+digest == b.rootfsDigest {
+		r, e := b.rootFSBlobstore.Get("assets/eirinifs.tar")
+		util.PanicOnError(errors.WithStack(e))
+		return r
+	}
+
+	r, e := b.digestLookupStore.Get("sha256:" + digest)
+	if _, notFound := e.(*bitsgo.NotFoundError); notFound {
+		return nil
+	}
+
+	util.PanicOnError(errors.WithStack(e))
+	return r
+}
+
+func (b *BitsImageManager) configMetadata(rootfsDigest string, dropletDigest string) []byte {
 	// TODO: ns, tzip why is this necessary?
 	// TDOO: ns, tzip how to handle this?
-	config, err := json.Marshal(map[string]interface{}{
+	config, e := json.Marshal(map[string]interface{}{
 		"config": map[string]interface{}{
 			"user": "vcap",
 		},
@@ -321,15 +205,6 @@ func getConfigMetaData(rootfsDigest string, dropletDigest string) (string, int64
 			},
 		},
 	})
-	buf := bytes.NewReader(config)
-	sum := sha256.New()
-	// stored := &bytes.Buffer{}
-	var size int64
-	if size, err = io.Copy(io.MultiWriter(sum, stored), buf); err != nil {
-		return "", 0, err
-	}
-
-	digest := "sha256:" + hex.EncodeToString(sum.Sum(nil))
-	digestToLayerMap[strings.Replace(digest, "sha256:", "", -1)] = "CONFIGLAYER"
-	return digest, size, nil
+	util.PanicOnError(errors.WithStack(e))
+	return config
 }

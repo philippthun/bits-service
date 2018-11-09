@@ -20,7 +20,7 @@ func SetUpAllRoutes(privateHost, publicHost string, basicAuthMiddleware *middlew
 	signBuildpackCacheURLHandler,
 	signAppStashURLHandler *bitsgo.SignResourceHandler,
 	appstashHandler *bitsgo.AppStashHandler,
-	packageHandler, buildpackHandler, dropletHandler, buildpackCacheHandler *bitsgo.ResourceHandler) http.Handler {
+	packageHandler, buildpackHandler, dropletHandler, buildpackCacheHandler *bitsgo.ResourceHandler) *mux.Router {
 
 	rootRouter := mux.NewRouter()
 
@@ -46,16 +46,6 @@ func SetUpAllRoutes(privateHost, publicHost string, basicAuthMiddleware *middlew
 	SetUpBuildpackRoutes(publicRouter, buildpackHandler)
 	SetUpDropletRoutes(publicRouter, dropletHandler)
 	SetUpBuildpackCacheRoutes(publicRouter, buildpackCacheHandler)
-
-	// // Insert Image Handler
-	// registry.AddImageHandler(internalRouter, registry.BitsImageManager{})
-	// // Insert API Handler
-	// registry.AddAPIVersionHandler(internalRouter)
-
-	ociRouter := mux.NewRouter()
-	rootRouter.PathPrefix("/v2").Handler(ociRouter)
-	registry.AddAPIVersionHandler(ociRouter)
-	registry.AddImageHandler(ociRouter, registry.BitsImageManager{})
 
 	rootRouter.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
@@ -140,4 +130,15 @@ func delegateWithQueryParamsExtractedTo(delegate func(http.ResponseWriter, *http
 		mux.Vars(request)["verb"] = request.URL.Query().Get("verb")
 		delegate(responseWriter, request, mux.Vars(request))
 	}
+}
+
+func AddImageHandler(rootRouter *mux.Router, handler *registry.ImageHandler) {
+	ociRouter := mux.NewRouter()
+	rootRouter.PathPrefix("/v2").Handler(ociRouter)
+
+	ociRouter.Path("/v2").Methods(http.MethodGet).HandlerFunc(handler.ServeAPIVersion)
+	ociRouter.Path("/v2/").Methods(http.MethodGet).HandlerFunc(handler.ServeAPIVersion)
+	ociRouter.Path("/v2/{name:[a-z0-9/\\.\\-_]+}/manifests/{tag}").Methods(http.MethodGet).HandlerFunc(handler.ServeManifest)
+	ociRouter.Path("/v2/{space}/{name}/manifests/{tag}").Methods(http.MethodGet).HandlerFunc(handler.ServeManifest)
+	ociRouter.Path("/v2/{name:[a-z0-9/\\.\\-_]+}/blobs/{digest}").Methods(http.MethodGet).HandlerFunc(handler.ServeLayer)
 }
