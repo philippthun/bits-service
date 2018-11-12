@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudfoundry-incubator/bits-service/blobstores/inmemory"
-
 	"github.com/cloudfoundry-incubator/bits-service/ccupdater"
 	"github.com/cloudfoundry-incubator/bits-service/oci_registry"
 
@@ -90,12 +88,16 @@ func main() {
 		routes.AddImageHandler(handler, &oci_registry.ImageHandler{
 			ImageManager: oci_registry.NewBitsImageManager(
 				createRootFSBlobstore(config.RootFS),
-				// This type assertion is a quick hack to get a NoRedirectBlobstore interface.
+				// TODO: This type assertion is a quick hack to get a NoRedirectBlobstore interface.
 				// Of course, the clean solution would be to have createBlobstoreAndSignURLHandler
 				// return a "combined" Blobstore/NoRedirectBlobstore interface.
 				// But this needs more thought first.
 				dropletBlobstore.(bitsgo.NoRedirectBlobstore),
-				inmemory_blobstore.NewBlobstore(),
+				// TODO: We should use a differently decorated blobstore for digestLookupStore:
+				// We want one with a non-partitioned prefix, so real droplets and
+				// oci-droplet layers (i.e. droplets with adjusted path prefixes)
+				// are easily distinguishable from their paths in the blobstore.
+				dropletBlobstore.(bitsgo.NoRedirectBlobstore),
 			),
 		})
 	}

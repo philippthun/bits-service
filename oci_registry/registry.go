@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 
@@ -33,7 +34,7 @@ func (m *ImageHandler) ServeAPIVersion(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *ImageHandler) ServeManifest(w http.ResponseWriter, r *http.Request) {
-	manifest := m.ImageManager.GetManifest(mux.Vars(r)["name"], mux.Vars(r)["tag"])
+	manifest := m.ImageManager.GetManifest(strings.TrimPrefix(mux.Vars(r)["name"], "cloudfoundry/"), mux.Vars(r)["tag"])
 
 	if manifest == nil {
 		http.NotFound(w, r)
@@ -70,6 +71,10 @@ func NewBitsImageManager(
 	digestLookupStore bitsgo.NoRedirectBlobstore) *BitsImageManager {
 
 	rootfsReader, e := rootFSBlobstore.Get("assets/eirinifs.tar")
+	if bitsgo.IsNotFoundError(e) {
+		panic(errors.New("Could not find assets/eirinifs.tar in root FS blobstore. " +
+			"Please make sure that copy it to the root FS blobstore as part of your deployment."))
+	}
 	util.PanicOnError(errors.WithStack(e))
 	rootfsDigest, rootfsSize := shaAndSize(rootfsReader)
 
@@ -82,12 +87,10 @@ func NewBitsImageManager(
 	}
 }
 
-// NOTE: name is currently not used.
-func (b *BitsImageManager) GetManifest(name string, tag string) []byte {
-	dropletGUID := tag
-	dropletReader, e := b.dropletBlobstore.Get(dropletGUID)
+func (b *BitsImageManager) GetManifest(dropletGUID string, dropletHash string) []byte {
+	dropletReader, e := b.dropletBlobstore.Get(dropletGUID + "/" + dropletHash)
 
-	if _, notFound := e.(*bitsgo.NotFoundError); notFound {
+	if bitsgo.IsNotFoundError(e) {
 		return nil
 	}
 	util.PanicOnError(errors.WithStack(e))
@@ -175,13 +178,13 @@ func shaAndSize(reader io.Reader) (sha string, size int64) {
 
 // NOTE: name is currently not used.
 func (b *BitsImageManager) GetLayer(name string, digest string) io.ReadCloser {
-	if "sha256:"+digest == b.rootfsDigest {
+	if digest == b.rootfsDigest {
 		r, e := b.rootFSBlobstore.Get("assets/eirinifs.tar")
 		util.PanicOnError(errors.WithStack(e))
 		return r
 	}
 
-	r, e := b.digestLookupStore.Get("sha256:" + digest)
+	r, e := b.digestLookupStore.Get(digest)
 	if _, notFound := e.(*bitsgo.NotFoundError); notFound {
 		return nil
 	}
