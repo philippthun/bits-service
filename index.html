@@ -286,7 +286,7 @@
 <blockquote>
 <p>Example request:</p>
 </blockquote>
-<pre class="highlight shell"><code>curl --request PUT --header <span class="s1">'Digest: sha256=abcdefg'</span> --data-binary @droplet-file <span class="s1">'https://example.com/signed/droplets/4facf67a-2880-4367-928e-b4c88f63bcda?md5=tDTwS8DEdA0T-b0RRx_TIw&amp;expires=1510839810'</span>
+<pre class="highlight shell"><code>curl --request PUT --header <span class="s1">'Digest: sha256=abcdefg'</span> --data-binary @droplet-file <span class="s1">'https://example.com/droplets/4facf67a-2880-4367-928e-b4c88f63bcda?md5=tDTwS8DEdA0T-b0RRx_TIw&amp;expires=1510839810'</span>
 </code></pre>
 <blockquote>
 <p>Example response:</p>
@@ -715,7 +715,7 @@
 </blockquote>
 <pre class="highlight shell"><code>HTTP/1.1 200 OK
 
-https://bits-service.example.com/signed/packages/test-package?signature<span class="o">=</span>313534313136363839352f7061636b616765732f6d79677569642067656865696de41965ab39e6fc7c04b662edc553cbb39fa62b2c5f4265dd38b241bee95eff40&amp;expires<span class="o">=</span>1497357804
+https://bits-service.example.com/packages/test-package?signature<span class="o">=</span>313534313136363839352f7061636b616765732f6d79677569642067656865696de41965ab39e6fc7c04b662edc553cbb39fa62b2c5f4265dd38b241bee95eff40&amp;expires<span class="o">=</span>1497357804
 </code></pre>
 <h3 id="http-request">HTTP Request</h3>
 
@@ -746,7 +746,7 @@ https://bits-service.example.com/signed/packages/test-package?signature<span cla
 <blockquote>
 <p>Example signed upload:</p>
 </blockquote>
-<pre class="highlight shell"><code>curl -X PUT <span class="s1">'https://internal.example.com/signed/packages/bdf47b84-1349-4abd-9561-5004858dfa05?signature=313534313136363839352f7061636b616765732f6d79677569642067656865696de41965ab39e6fc7c04b662edc553cbb39fa62b2c5f4265dd38b241bee95eff40&amp;expires=1541166895'</span> <span class="se">\</span>
+<pre class="highlight shell"><code>curl -X PUT <span class="s1">'https://internal.example.com/packages/bdf47b84-1349-4abd-9561-5004858dfa05?signature=313534313136363839352f7061636b616765732f6d79677569642067656865696de41965ab39e6fc7c04b662edc553cbb39fa62b2c5f4265dd38b241bee95eff40&amp;expires=1541166895'</span> <span class="se">\</span>
   -F <span class="nv">package</span><span class="o">=</span>@package-file
 </code></pre>
 <aside class="notice">Notice:
